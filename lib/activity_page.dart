@@ -21,7 +21,7 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
   void initState() {
     super.initState();
     _tabController = TabController(length: 2, vsync: this);
-    _fetchReports(); // Fetch reports based on the logged-in user's name
+    _fetchReports();
   }
 
   @override
@@ -30,7 +30,7 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
     super.dispose();
   }
 
-  // Fetch reports based on the logged-in user's name
+  // Fetch reports based on the logged-in user's UID instead of name
   Future<void> _fetchReports() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -42,13 +42,15 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
         return;
       }
 
-      final userName = user.displayName; // Get the logged-in user's name
-      final databaseRef = FirebaseDatabase.instance.ref("reports_image"); // Reference to reports node
+      // We'll use user.uid to match 'senderId' in the reports
+      final userId = user.uid;
+      final databaseRef = FirebaseDatabase.instance.ref("reports_image");
       final snapshot = await databaseRef.get();
 
       if (snapshot.exists) {
         final data = snapshot.value as Map<dynamic, dynamic>;
 
+        // Convert each entry to a Map
         List<Map<String, dynamic>> allReports = data.entries.map((entry) {
           final reportData = entry.value as Map<dynamic, dynamic>;
           return {
@@ -59,23 +61,29 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
             'description': reportData['description'] ?? 'No description provided.',
             'fireTruckNumber': reportData['fireTruckNumber'] ?? 'Unknown',
             'location': reportData['location'] ?? 'No location provided',
-            'senderName': reportData['senderName'], // Sender's name
+            // Make sure 'senderId' is stored in your "reports_image" data
+            'senderId': reportData['senderId'] ?? '',
+            'senderName': reportData['senderName'] ?? 'Unknown',
           };
         }).toList();
 
         setState(() {
-          // Filter reports by sender's name (userName)
+          // Filter by 'senderId' == userId, and if status != 'Resolved', it's ongoing
           ongoingReports = allReports
               .where((report) =>
-                  report['senderName'] == userName && report['status'] != 'Resolved')
+                  report['senderId'] == userId && report['status'] != 'Resolved')
               .toList();
+
+          // Filter by 'senderId' == userId, and if status == 'Resolved', it's completed
           completedReports = allReports
               .where((report) =>
-                  report['senderName'] == userName && report['status'] == 'Resolved')
+                  report['senderId'] == userId && report['status'] == 'Resolved')
               .toList();
+
           isLoading = false;
         });
       } else {
+        // No data in 'reports_image'
         setState(() {
           isLoading = false;
         });
@@ -115,7 +123,7 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
           child: TabBar(
             controller: _tabController,
             labelColor: Colors.white,
-            unselectedLabelColor: const Color.fromARGB(255, 255, 249, 249),
+            unselectedLabelColor: Color.fromARGB(255, 255, 249, 249),
             indicator: BoxDecoration(
               color: Colors.red,
               borderRadius: BorderRadius.circular(5),
@@ -222,6 +230,8 @@ class ActivityPageState extends State<ActivityPage> with SingleTickerProviderSta
         return Colors.orange;
       case 'In Progress':
         return Colors.blue;
+      case 'Accepted':
+        return Colors.purple; // You can change it to any color you like
       default:
         return Colors.black;
     }
