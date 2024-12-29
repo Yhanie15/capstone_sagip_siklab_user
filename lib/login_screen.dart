@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart'; // Import Google Sign-In
 import 'signup_screen.dart';
 import 'home_page.dart';  // Import the home page
- import 'package:firebase_database/firebase_database.dart';
+import 'package:firebase_database/firebase_database.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -20,78 +20,78 @@ class LoginScreenState extends State<LoginScreen> {
   bool isLoading = false;
 
   // Sign in with Google
+  Future<void> signInWithGoogle() async {
+    setState(() {
+      isLoading = true;
+    });
 
-Future<void> signInWithGoogle() async {
-  setState(() {
-    isLoading = true;
-  });
+    try {
+      // Attempt Google sign-in
+      final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
+      if (googleUser == null) {
+        setState(() {
+          isLoading = false;
+        });
+        return; // User canceled sign-in
+      }
 
-  try {
-    // Attempt Google sign-in
-    final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
-    if (googleUser == null) {
+      final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
+      if (googleAuth.accessToken == null || googleAuth.idToken == null) {
+        throw Exception('Missing Google authentication tokens');
+      }
+
+      final OAuthCredential credential = GoogleAuthProvider.credential(
+        accessToken: googleAuth.accessToken,
+        idToken: googleAuth.idToken,
+      );
+
+      // Sign in the user with Firebase
+      UserCredential userCredential = await _auth.signInWithCredential(credential);
+
+      // Get user details
+      final User? user = userCredential.user;
+
+      if (user != null) {
+        // Save user data in the "resident" node, including a residentId
+        DatabaseReference residentRef = FirebaseDatabase.instance.ref("resident/${user.uid}");
+
+        // If you want to avoid overwriting existing data, you could do a .get() first, but here we just set
+        await residentRef.set({
+          'name': user.displayName ?? 'No Name',
+          'email': user.email,
+          'residentId': user.uid, // <--- we add this field
+          'createdAt': DateTime.now().toIso8601String(),
+        });
+      }
+
+      // Navigate to HomePage after successful login
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
+      );
+    } catch (e) {
+      print('Google sign-in failed: $e');
+      showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('Error'),
+          content: Text(e.toString()),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop();
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        ),
+      );
+    } finally {
       setState(() {
         isLoading = false;
       });
-      return; // User canceled sign-in
     }
-
-    final GoogleSignInAuthentication googleAuth = await googleUser.authentication;
-    if (googleAuth.accessToken == null || googleAuth.idToken == null) {
-      throw Exception('Missing Google authentication tokens');
-    }
-
-    final OAuthCredential credential = GoogleAuthProvider.credential(
-      accessToken: googleAuth.accessToken,
-      idToken: googleAuth.idToken,
-    );
-
-    // Sign in the user with Firebase
-    UserCredential userCredential = await _auth.signInWithCredential(credential);
-
-    // Get user details
-    final User? user = userCredential.user;
-
-    if (user != null) {
-      // Save user data in the "resident" node
-      DatabaseReference residentRef = FirebaseDatabase.instance.ref("resident/${user.uid}");
-      await residentRef.set({
-        'name': user.displayName ?? 'No Name',
-        'email': user.email,
-        'createdAt': DateTime.now().toIso8601String(),
-      });
-    }
-
-    // Navigate to HomePage after successful login
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const HomePage()),
-    );
-  } catch (e) {
-    print('Google sign-in failed: $e');
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Error'),
-        content: Text(e.toString()),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-            },
-            child: const Text('OK'),
-          ),
-        ],
-      ),
-    );
-  } finally {
-    setState(() {
-      isLoading = false;
-    });
   }
-}
-
-
 
   // Sign in with email and password
   Future<void> signInUser() async {
@@ -224,21 +224,20 @@ Future<void> signInWithGoogle() async {
               isLoading
                   ? const CircularProgressIndicator()
                   : ElevatedButton.icon(
-  onPressed: signInWithGoogle,
-  icon: Image.asset('assets/google_logo.png', height: 30), // Custom Google logo
-  label: const Text(
-    'Log in with Google',
-    style: TextStyle(fontSize: 18),
-  ),
-  style: ElevatedButton.styleFrom(
-    minimumSize: const Size(double.infinity, 50),
-    backgroundColor: Colors.grey,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(8.0),
-    ),
-  ),
-),
-
+                      onPressed: signInWithGoogle,
+                      icon: Image.asset('assets/google_logo.png', height: 30), // Custom Google logo
+                      label: const Text(
+                        'Log in with Google',
+                        style: TextStyle(fontSize: 18),
+                      ),
+                      style: ElevatedButton.styleFrom(
+                        minimumSize: const Size(double.infinity, 50),
+                        backgroundColor: Colors.grey,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(8.0),
+                        ),
+                      ),
+                    ),
 
               const SizedBox(height: 20),
 
@@ -282,4 +281,3 @@ Future<void> signInWithGoogle() async {
     );
   }
 }
- 
