@@ -8,6 +8,7 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart'; // Geocoding package for reverse geocoding
 import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
+import 'home_page.dart'; // Make sure HomePage is imported
 
 class FireReportVideoCallPage extends StatefulWidget {
   final String appId;
@@ -35,9 +36,9 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
   final AudioPlayer _audioPlayer = AudioPlayer();
   bool _isCalling = true;
   late DatabaseReference _databaseReference;
-  String? _currentAddress; // Address of the location
+  String? _currentAddress;
   String? _callKey;
-  bool _isAnswered = false; // Track if the call is answered
+  bool _isAnswered = false; // Whether the admin joined
 
   @override
   void initState() {
@@ -67,7 +68,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
           debugPrint('Resident joined the channel');
           _saveCallDetails(); // Save the call details to Firebase
-          _notifyAdmin(); // Notify admin about the call
+          _notifyAdmin();     // Notify admin about the call
           setState(() {
             _localUserJoined = true;
           });
@@ -75,15 +76,14 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
         onUserJoined: (RtcConnection connection, int remoteUid, int elapsed) {
           debugPrint('Admin user $remoteUid joined');
           _stopRingtone();
-          _updateCallStatus("Answered"); // Update call status to "Answered"
+          _updateCallStatus("Answered");
           setState(() {
             _isCalling = false;
             _remoteUid = remoteUid;
-            _isAnswered = true; // Mark the call as answered
+            _isAnswered = true;
           });
         },
-        onUserOffline: (RtcConnection connection, int remoteUid,
-            UserOfflineReasonType reason) {
+        onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
           debugPrint('Admin user $remoteUid left');
           setState(() {
             _remoteUid = null;
@@ -91,8 +91,9 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
         },
         onLeaveChannel: (RtcConnection connection, RtcStats stats) {
           debugPrint('Resident left the channel. Stats: ${stats.toJson()}');
+          // If user leaves the channel but the call was never answered:
           if (!_isAnswered) {
-            _updateCallStatus("Missed Call"); // Only update to "Missed Call" if not answered
+            _updateCallStatus("Missed Call");
           }
         },
       ),
@@ -119,16 +120,12 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
 
   Future<void> _getCurrentLocationAndAddress() async {
     try {
-      // Get the current position
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
 
-      // Use Geocoding to get the address
-      List<Placemark> placemarks = await placemarkFromCoordinates(
-        position.latitude,
-        position.longitude,
-      );
+      List<Placemark> placemarks =
+          await placemarkFromCoordinates(position.latitude, position.longitude);
 
       Placemark place = placemarks[0];
       setState(() {
@@ -146,7 +143,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
     final callDetails = {
       'channelName': widget.channelName,
       'residentName': 'Resident ${DateTime.now().millisecondsSinceEpoch}',
-      'address': _currentAddress, // Exact address instead of coordinates
+      'address': _currentAddress,
       'time': DateTime.now().toIso8601String(),
       'status': 'Ongoing',
     };
@@ -161,7 +158,6 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
 
   Future<void> _updateCallStatus(String status) async {
     if (_callKey == null) return;
-
     await _databaseReference.child(_callKey!).update({'status': status});
     debugPrint('Call status updated to $status');
   }
@@ -215,11 +211,40 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
     await _engine.switchCamera();
   }
 
+  // Show the "Sorry admin didn't answer" dialog
+  void _showMissedCallDialog() {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Call Ended'),
+          content: const Text('Sorry, the admin did not answer your call.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                // Navigate to HomePage
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const HomePage()),
+                );
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
   @override
   void dispose() {
+    // Stop the ringtone if still playing
     _stopRingtone();
+
+    // If user closes screen and call was never answered, set Missed
     if (!_isAnswered) {
-      _updateCallStatus("Missed Call"); // Only update to "Missed Call" if not answered
+      _updateCallStatus("Missed Call");
     }
     _engine.leaveChannel();
     _engine.release();
@@ -245,6 +270,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
             )
           else
             const Center(child: CircularProgressIndicator()),
+
           // Show "Calling Admin..." text while waiting
           if (_isCalling)
             Center(
@@ -258,6 +284,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
                 ],
               ),
             ),
+
           // Control buttons
           Positioned(
             bottom: 50,
@@ -276,6 +303,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
                   tooltip: _isMicMuted ? 'Unmute' : 'Mute',
                 ),
                 const SizedBox(width: 20),
+
                 // Switch camera button
                 IconButton(
                   icon: Icon(
@@ -286,15 +314,26 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
                   tooltip: 'Switch Camera',
                 ),
                 const SizedBox(width: 20),
+
                 // End call button
                 IconButton(
                   icon: const Icon(Icons.call_end, color: Colors.red),
                   onPressed: () async {
+                    // Always stop the ring first
+                    await _stopRingtone();
+
+                    // If admin never answered, it's a missed call scenario
                     if (!_isAnswered) {
                       _updateCallStatus("Missed Call");
+                      await _engine.leaveChannel();
+
+                      // Show missed call dialog
+                      _showMissedCallDialog();
+                    } else {
+                      // If the admin answered, just end the call
+                      await _engine.leaveChannel();
+                      Navigator.pop(context);
                     }
-                    await _engine.leaveChannel();
-                    Navigator.pop(context);
                   },
                   tooltip: 'End Call',
                 ),
