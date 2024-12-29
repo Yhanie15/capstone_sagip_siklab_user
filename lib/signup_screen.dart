@@ -32,61 +32,65 @@ class SignupScreenState extends State<SignupScreen> {
   String? selectedBarangay;
 
   bool isLoading = false;
+  
+  // For toggling password visibility
+  bool _obscurePassword = true;
 
   // Sign Up user function
   Future<void> signUpUser() async {
-  setState(() {
-    isLoading = true;
-  });
-
-  try {
-    // Creating a user with email and password
-    UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
-      email: emailController.text.trim(),
-      password: passwordController.text.trim(),
-    );
-
-    // Save user data in Firebase Realtime Database under the "resident" node
-    await _database.ref("resident/${userCredential.user!.uid}").set({
-      'name': nameController.text.trim(),
-      'email': userCredential.user!.email,
-      'mobile': mobileController.text.trim(),
-      'district': selectedDistrict,
-      'barangay': selectedBarangay,
-      'createdAt': DateTime.now().toIso8601String(),
+    setState(() {
+      isLoading = true;
     });
 
-    // Navigate to login screen after successful signup
-    Navigator.pushReplacement(
-      context,
-      MaterialPageRoute(builder: (context) => const LoginScreen()),
-    );
-  } catch (e) {
-    print(e);
-    // Show error message if signup fails
-    showDialog(
-      context: context,
-      builder: (BuildContext context) {
-        return AlertDialog(
-          title: const Text('Error'),
-          content: Text(e.toString()),
-          actions: [
-            TextButton(
-              onPressed: () {
-                Navigator.of(context).pop();
-              },
-              child: const Text('OK'),
-            ),
-          ],
-        );
-      },
-    );
-  }
+    try {
+      // Creating a user with email and password
+      UserCredential userCredential = await _auth.createUserWithEmailAndPassword(
+        email: emailController.text.trim(),
+        password: passwordController.text.trim(),
+      );
 
-  setState(() {
-    isLoading = false;
-  });
-}
+      // Add the new user's data to the "resident" node
+      await _database.ref("resident/${userCredential.user!.uid}").set({
+        'residentId': userCredential.user!.uid,
+        'name': nameController.text.trim(),
+        'email': userCredential.user!.email,
+        'mobile': mobileController.text.trim(),
+        'district': selectedDistrict,
+        'barangay': selectedBarangay,
+        'createdAt': DateTime.now().toIso8601String(),
+      });
+
+      // Navigate to login screen after successful signup
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const LoginScreen()),
+      );
+    } catch (e) {
+      print(e);
+      // Show error message if signup fails
+      showDialog(
+        context: context,
+        builder: (BuildContext context) {
+          return AlertDialog(
+            title: const Text('Error'),
+            content: Text(e.toString()),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: const Text('OK'),
+              ),
+            ],
+          );
+        },
+      );
+    }
+
+    setState(() {
+      isLoading = false;
+    });
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -153,14 +157,24 @@ class SignupScreenState extends State<SignupScreen> {
               ),
               const SizedBox(height: 20),
 
-              // Password text field
+              // Password text field with eye icon to toggle visibility
               TextField(
                 controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
+                obscureText: _obscurePassword,
+                decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscurePassword ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        _obscurePassword = !_obscurePassword;
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
