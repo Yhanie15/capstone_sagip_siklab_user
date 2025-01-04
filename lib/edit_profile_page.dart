@@ -1,3 +1,5 @@
+// ignore_for_file: library_private_types_in_public_api, avoid_print, deprecated_member_use, use_build_context_synchronously
+
 import 'package:flutter/material.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart';
@@ -137,7 +139,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
         title: const Text(
           'Edit Profile',
           style: TextStyle(
-            color: Colors.red,
+            color: Colors.white,
             fontWeight: FontWeight.bold,
             fontSize: 20,
           ),
@@ -232,7 +234,7 @@ class _EditProfilePageState extends State<EditProfilePage> {
           hintText: hintText,
           hintStyle: const TextStyle(color: Colors.white),
           filled: true,
-          fillColor: Colors.black,
+          fillColor: const Color.fromARGB(255, 53, 52, 52),
           contentPadding:
               const EdgeInsets.symmetric(horizontal: 20, vertical: 15),
           border: OutlineInputBorder(

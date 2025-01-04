@@ -1,10 +1,12 @@
+// ignore_for_file: unnecessary_null_comparison, deprecated_member_use, avoid_print, use_build_context_synchronously
+
 import 'dart:convert'; // For JSON encoding/decoding
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:firebase_database/firebase_database.dart'; // For Realtime Database
 import 'package:flutter/material.dart';
 import 'dart:io'; // For File usage
 import 'package:geolocator/geolocator.dart'; // For getting coordinates
-import 'package:geocoding/geocoding.dart'; // For reverse geocoding
+import 'package:geocoding/geocoding.dart'; // For reverse and forward geocoding
 import 'package:http/http.dart' as http; // For Cloudinary API requests
 import 'activity_page.dart';
 import 'home_page.dart';
@@ -23,6 +25,8 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
   String residentId = '';            // Variable to store resident's ID
   bool isLoading = true;             // To show loading state while fetching data
   String userLocation = 'Fetching location...'; // To store the user's location
+  double? latitude;                  // Variable to store latitude
+  double? longitude;                 // Variable to store longitude
 
   @override
   void initState() {
@@ -31,7 +35,7 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
     _getCurrentLocation();
   }
 
-  // Fetch the user's name and residentId from Firebase Realtime Database
+  // Fetch the user's name, residentId, and possibly address from Firebase Realtime Database
   Future<void> _fetchSenderName() async {
     try {
       final user = FirebaseAuth.instance.currentUser;
@@ -47,6 +51,11 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
             residentId = userData['residentId'] ?? '';  // Fetch the residentId
             isLoading = false;
           });
+
+          // If the resident has an address, you can perform forward geocoding here
+          if (userData['address'] != null && userData['address'].toString().isNotEmpty) {
+            await _geocodeAddress(userData['address']);
+          }
         } else {
           setState(() {
             senderName = user.displayName ?? 'Unknown';
@@ -65,6 +74,23 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
         senderName = 'Error fetching name';
         isLoading = false;
       });
+    }
+  }
+
+  // Geocode an address to get latitude and longitude
+  Future<void> _geocodeAddress(String address) async {
+    try {
+      List<Location> locations = await locationFromAddress(address);
+      if (locations.isNotEmpty) {
+        setState(() {
+          latitude = locations.first.latitude;
+          longitude = locations.first.longitude;
+          userLocation = address;
+        });
+      }
+    } catch (e) {
+      print("Error geocoding address: $e");
+      // Optionally fallback to device location or handle the error
     }
   }
 
@@ -106,6 +132,8 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
       setState(() {
         userLocation =
             '${place.street}, ${place.locality}, ${place.administrativeArea}, ${place.country}';
+        latitude = position.latitude;
+        longitude = position.longitude;
       });
     } catch (e) {
       print("Error: $e");
@@ -164,6 +192,8 @@ class SubmitPictureReportState extends State<SubmitPictureReport> {
         'senderName': senderName,
         'senderId': residentId,     // We store the residentId too
         'location': userLocation,
+        'latitude': latitude ?? 0.0,   // Save latitude, default to 0.0 if null
+        'longitude': longitude ?? 0.0, // Save longitude, default to 0.0 if null
         'imageUrl': imageUrl,
         'timestamp': DateTime.now().toIso8601String(),
         'status': 'Pending',       // Set default status to 'pending'

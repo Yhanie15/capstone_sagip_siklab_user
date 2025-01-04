@@ -1,4 +1,7 @@
-import 'package:capstone_sagip_siklab_user/location_test.dart';
+// ignore_for_file: avoid_print, use_build_context_synchronously, deprecated_member_use, unused_field, unused_element
+
+import 'package:capstone_sagip_siklab_user/fire_safety_tips_page.dart';
+import 'package:capstone_sagip_siklab_user/privacy_policy_page.dart';
 import 'package:capstone_sagip_siklab_user/video_call.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:url_launcher/url_launcher.dart';
@@ -6,21 +9,19 @@ import 'package:firebase_database/firebase_database.dart'; // For Realtime Datab
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart'; // Import permission_handler
 import 'package:geolocator/geolocator.dart'; // Import geolocator
-import 'package:google_sign_in/google_sign_in.dart';
 import 'activity_page.dart';
 import 'login_screen.dart';
 import 'profile_page.dart';
-import 'confirm_location_page.dart';
 import 'picture_report.dart';
 
 class HomePage extends StatefulWidget {
   const HomePage({super.key});
 
   @override
-  _HomePageState createState() => _HomePageState();
+  HomePageState createState() => HomePageState();
 }
 
-class _HomePageState extends State<HomePage> {
+class HomePageState extends State<HomePage> {
   Position? _currentPosition; // Store the current position
 
   // Function to fetch user data from Firebase
@@ -246,11 +247,21 @@ class _HomePageState extends State<HomePage> {
                         ListTile(
                           leading: const Icon(Icons.article, color: Colors.black),
                           title: const Text('News'),
-                          onTap: () {},
+                          onTap: () async {
+                            final Uri url = Uri.parse('https://qcfiredistrict.com/');
+                            if (await canLaunchUrl(url)) {
+                              await launchUrl(
+                                url,
+                                mode: LaunchMode.externalApplication,
+                              );
+                            } else {
+                              throw 'Could not launch $url';
+                            }
+                          },
                         ),
                         ListTile(
                           leading: const Icon(Icons.history, color: Colors.black),
-                          title: const Text('Activity'),
+                          title: const Text('Report History'),
                           onTap: () {
                             Navigator.pushReplacement(
                               context,
@@ -261,7 +272,13 @@ class _HomePageState extends State<HomePage> {
                         ListTile(
                           leading: const Icon(Icons.info, color: Colors.black),
                           title: const Text('Fire Safety Tips'),
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.pop(context); // Close the drawer
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const FireSafetyTipsPage()),
+                            );
+                          },
                         ),
                         ListTile(
                           leading: const Icon(Icons.account_circle, color: Colors.black),
@@ -277,31 +294,36 @@ class _HomePageState extends State<HomePage> {
                         ListTile(
                           leading: const Icon(Icons.privacy_tip, color: Colors.black),
                           title: const Text('Privacy Policy'),
-                          onTap: () {},
+                          onTap: () {
+                            Navigator.pop(context); // Close the drawer
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(builder: (context) => const PrivacyPolicyPage()),
+                            );
+                          },
                         ),
                         ListTile(
-  leading: const Icon(Icons.logout, color: Colors.black),
-  title: const Text('Log Out'),
-  onTap: () async {
-    try {
-      // Sign out from FirebaseAuth
-      await FirebaseAuth.instance.signOut();
-      
-      // Navigate to the LoginScreen and remove all previous routes
-      Navigator.pushAndRemoveUntil(
-        context,
-        MaterialPageRoute(builder: (context) => const LoginScreen()),
-        (route) => false,
-      );
-    } catch (e) {
-      // Handle potential errors during sign out
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Error during logout: $e')),
-      );
-    }
-  },
-),
-
+                          leading: const Icon(Icons.logout, color: Colors.black),
+                          title: const Text('Log Out'),
+                          onTap: () async {
+                            try {
+                              // Sign out from FirebaseAuth
+                              await FirebaseAuth.instance.signOut();
+                              
+                              // Navigate to the LoginScreen and remove all previous routes
+                              Navigator.pushAndRemoveUntil(
+                                context,
+                                MaterialPageRoute(builder: (context) => const LoginScreen()),
+                                (route) => false,
+                              );
+                            } catch (e) {
+                              // Handle potential errors during sign out
+                              ScaffoldMessenger.of(context).showSnackBar(
+                                SnackBar(content: Text('Error during logout: $e')),
+                              );
+                            }
+                          },
+                        ),
                       ],
                     ),
                   ),
@@ -314,7 +336,7 @@ class _HomePageState extends State<HomePage> {
           );
         },
       ),
-       body: Stack(
+      body: Stack(
         children: [
           // Background image
           Container(
@@ -357,7 +379,7 @@ class _HomePageState extends State<HomePage> {
                                     text: '2 ',
                                     style: TextStyle(color: Colors.blue, fontWeight: FontWeight.bold),
                                   ),
-                                  TextSpan(text: 'to capture and report fire.')
+                                  TextSpan(text: 'to capture and report fire.'),
                                 ],
                               ),
                             ),
@@ -368,47 +390,47 @@ class _HomePageState extends State<HomePage> {
                               children: [
                                 // Button 1 - Call
                                 ElevatedButton(
-  onPressed: () {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => const FireReportVideoCallPage(
-          channelName: 'sagip_siklab', // Replace with your desired channel name
-          token: '007eJxTYLAM39eqtaJjvr5miv20t1zMV39Om61c/TLhjbTcsvwtWU8VGCwTLRINDVNM09IMEk3SjC0sUsws09LMk0zTLAyMjS2N8ssK0xsCGRnWVQuzMDJAIIjPw1CcmJ5ZEF+cmZ2TmMTAAAA7NyIp',
-          appId: '9a8a11d5ff0a4f388d69ff7b5f803392', // Replace with your Agora App ID
-        ),
-      ),
-    );
-  },
-  style: ElevatedButton.styleFrom(
-    backgroundColor: Colors.green,
-    shape: RoundedRectangleBorder(
-      borderRadius: BorderRadius.circular(10),
-    ),
-    padding: const EdgeInsets.symmetric(
-      vertical: 20,
-      horizontal: 30,
-    ),
-  ),
-  child: Stack(
-    alignment: Alignment.center,
-    children: [
-      Icon(
-        Icons.videocam,
-        size: 40,
-        color: Colors.white.withOpacity(0.3),
-      ),
-      const Text(
-        '1',
-        style: TextStyle(
-          fontSize: 24,
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        ),
-      ),
-    ],
-  ),
-),
+                                  onPressed: () {
+                                    Navigator.push(
+                                      context,
+                                      MaterialPageRoute(
+                                        builder: (context) => const FireReportVideoCallPage(
+                                          channelName: 'sagip_siklab', // Replace with your desired channel name
+                                          token: '007eJxTYHDf3P1IIaol6vHVz45X/bc9PikdbcQy/Wrw7Yptks3xWhMUGCwTLRINDVNM09IMEk3SjC0sUsws09LMk0zTLAyMjS2NmrUq0xsCGRnmKASzMDJAIIjPw1CcmJ5ZEF+cmZ2TmMTAAACaXCKs',
+                                          appId: '9a8a11d5ff0a4f388d69ff7b5f803392', // Replace with your Agora App ID
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.green,
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(10),
+                                    ),
+                                    padding: const EdgeInsets.symmetric(
+                                      vertical: 20,
+                                      horizontal: 30,
+                                    ),
+                                  ),
+                                  child: Stack(
+                                    alignment: Alignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.videocam,
+                                        size: 40,
+                                        color: Colors.white.withOpacity(0.3),
+                                      ),
+                                      const Text(
+                                        '1',
+                                        style: TextStyle(
+                                          fontSize: 24,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
                                 const SizedBox(width: 20),
                                 // Button 2 - Capture
                                 ElevatedButton(
@@ -434,8 +456,8 @@ class _HomePageState extends State<HomePage> {
                                       // Camera Icon background
                                       Icon(
                                         Icons.camera_alt,
-                                        size: 40, // Adjust size as needed
-                                        color: Colors.black.withOpacity(0.2), // Semi-transparent dark color
+                                        size: 40,
+                                        color: Colors.black.withOpacity(0.2),
                                       ),
                                       // Number "2" text
                                       const Text(

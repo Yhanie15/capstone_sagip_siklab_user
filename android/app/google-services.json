@@ -1,0 +1,56 @@
+{
+  "project_info": {
+    "project_number": "247249927696",
+    "firebase_url": "https://capstone-sagip-siklab-default-rtdb.firebaseio.com",
+    "project_id": "capstone-sagip-siklab",
+    "storage_bucket": "capstone-sagip-siklab.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:247249927696:android:17ffe0adcbf0a673371495",
+        "android_client_info": {
+          "package_name": "com.example.capstone_sagip_siklab_user"
+        }
+      },
+      "oauth_client": [
+        {
+          "client_id": "247249927696-bva0172fhpl0br8jtehhn0ni23ogdg6h.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.capstone_sagip_siklab_user",
+            "certificate_hash": "4cd592c04fc8acec2cfbb297829fa7a734b426dd"
+          }
+        },
+        {
+          "client_id": "247249927696-u08eullg3bpo3htjvdt830ur6an6ibdh.apps.googleusercontent.com",
+          "client_type": 1,
+          "android_info": {
+            "package_name": "com.example.capstone_sagip_siklab_user",
+            "certificate_hash": "396beb1e2ca0f8fa7067c8727b27ecdb178f700b"
+          }
+        },
+        {
+          "client_id": "247249927696-o0ghhu5etsd5mm57la0vssqcih2hde4q.apps.googleusercontent.com",
+          "client_type": 3
+        }
+      ],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBEzP4F_2vSvHqmHa3WdPgFxolLJYJ3i0I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": [
+            {
+              "client_id": "247249927696-o0ghhu5etsd5mm57la0vssqcih2hde4q.apps.googleusercontent.com",
+              "client_type": 3
+            }
+          ]
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

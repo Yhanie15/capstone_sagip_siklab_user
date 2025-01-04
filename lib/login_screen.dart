@@ -1,9 +1,12 @@
+// ignore_for_file: unused_element, use_build_context_synchronously, avoid_print
+
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
 import 'package:google_sign_in/google_sign_in.dart'; // Import Google Sign-In
 import 'signup_screen.dart';
 import 'home_page.dart';  // Import the home page
 import 'package:firebase_database/firebase_database.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
@@ -18,6 +21,37 @@ class LoginScreenState extends State<LoginScreen> {
   final FirebaseAuth _auth = FirebaseAuth.instance;
   final GoogleSignIn _googleSignIn = GoogleSignIn(); // Initialize GoogleSignIn
   bool isLoading = false;
+  bool isPasswordVisible = false; // Toggle for password visibility
+
+  @override
+  void initState() {
+    super.initState();
+    _checkLoginStatus();
+  }
+
+  Future<void> _checkLoginStatus() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    bool? isLoggedIn = prefs.getBool('isLoggedIn');
+
+    if (isLoggedIn == true && _auth.currentUser != null) {
+      Navigator.pushReplacement(
+        context,
+        MaterialPageRoute(builder: (context) => const HomePage()),
+      );
+    }
+  }
+
+  // Save login state to SharedPreferences
+  Future<void> _saveLoginState() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', true);
+  }
+
+  // Clear login state from SharedPreferences
+  Future<void> _clearLoginState() async {
+    SharedPreferences prefs = await SharedPreferences.getInstance();
+    await prefs.setBool('isLoggedIn', false);
+  }
 
   // Sign in with Google
   Future<void> signInWithGoogle() async {
@@ -26,7 +60,6 @@ class LoginScreenState extends State<LoginScreen> {
     });
 
     try {
-      // Attempt Google sign-in
       final GoogleSignInAccount? googleUser = await _googleSignIn.signIn();
       if (googleUser == null) {
         setState(() {
@@ -45,23 +78,30 @@ class LoginScreenState extends State<LoginScreen> {
         idToken: googleAuth.idToken,
       );
 
-      // Sign in the user with Firebase
       UserCredential userCredential = await _auth.signInWithCredential(credential);
-
-      // Get user details
       final User? user = userCredential.user;
 
       if (user != null) {
-        // Save user data in the "resident" node, including a residentId
         DatabaseReference residentRef = FirebaseDatabase.instance.ref("resident/${user.uid}");
 
-        // If you want to avoid overwriting existing data, you could do a .get() first, but here we just set
-        await residentRef.set({
-          'name': user.displayName ?? 'No Name',
-          'email': user.email,
-          'residentId': user.uid, // <--- we add this field
-          'createdAt': DateTime.now().toIso8601String(),
-        });
+        // Fetch existing data
+        DataSnapshot snapshot = await residentRef.get();
+        Map<String, dynamic> existingData = snapshot.exists
+            ? Map<String, dynamic>.from(snapshot.value as Map)
+            : {};
+
+        // Merge existing data with new data, leave mobile and barangay blank if not present
+        Map<String, dynamic> updatedData = {
+          'name': existingData['name'] ?? user.displayName ?? 'No Name',
+          'email': existingData['email'] ?? user.email,
+          'mobile': existingData['mobile'] ?? '',
+          'barangay': existingData['barangay'] ?? '',
+          'residentId': user.uid,
+          'createdAt': existingData['createdAt'] ?? DateTime.now().toIso8601String(),
+        };
+
+        await residentRef.set(updatedData);
+        await _saveLoginState(); // Save login state
       }
 
       // Navigate to HomePage after successful login
@@ -93,6 +133,28 @@ class LoginScreenState extends State<LoginScreen> {
     }
   }
 
+  // Forgot password functionality
+  Future<void> resetPassword() async {
+    if (emailController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Please enter your email address.')),
+      );
+      return;
+    }
+
+    try {
+      await _auth.sendPasswordResetEmail(email: emailController.text.trim());
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('Password reset email sent.')),
+      );
+    } catch (e) {
+      print('Password reset failed: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error: $e')),
+      );
+    }
+  }
+
   // Sign in with email and password
   Future<void> signInUser() async {
     setState(() {
@@ -105,6 +167,8 @@ class LoginScreenState extends State<LoginScreen> {
         email: emailController.text.trim(),
         password: passwordController.text.trim(),
       );
+
+      await _saveLoginState(); // Save login state
 
       // Navigate to HomePage after successful login
       Navigator.pushReplacement(
@@ -191,11 +255,21 @@ class LoginScreenState extends State<LoginScreen> {
               // Password text field
               TextField(
                 controller: passwordController,
-                obscureText: true,
-                decoration: const InputDecoration(
+                obscureText: !isPasswordVisible,
+                decoration: InputDecoration(
                   labelText: 'Password',
-                  prefixIcon: Icon(Icons.lock),
-                  border: OutlineInputBorder(),
+                  prefixIcon: const Icon(Icons.lock),
+                  border: const OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      isPasswordVisible ? Icons.visibility : Icons.visibility_off,
+                    ),
+                    onPressed: () {
+                      setState(() {
+                        isPasswordVisible = !isPasswordVisible;
+                      });
+                    },
+                  ),
                 ),
               ),
               const SizedBox(height: 20),
@@ -246,9 +320,7 @@ class LoginScreenState extends State<LoginScreen> {
                 mainAxisAlignment: MainAxisAlignment.spaceBetween,
                 children: [
                   TextButton(
-                    onPressed: () {
-                      // Navigate to Forgot Password Screen (Implement if needed)
-                    },
+                    onPressed: resetPassword,
                     child: const Text(
                       'Forgot Password?',
                       style: TextStyle(

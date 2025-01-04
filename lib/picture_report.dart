@@ -1,3 +1,5 @@
+// ignore_for_file: unused_local_variable, avoid_print, deprecated_member_use
+
 import 'package:flutter/material.dart';
 import 'package:camera/camera.dart';
 import 'package:path_provider/path_provider.dart';

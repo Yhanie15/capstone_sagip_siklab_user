@@ -1,14 +1,18 @@
+// ignore_for_file: unused_field, use_super_parameters, library_private_types_in_public_api, await_only_futures, deprecated_member_use, prefer_const_constructors, use_build_context_synchronously
+
 import 'dart:async';
 import 'dart:convert';
 import 'package:agora_rtc_engine/agora_rtc_engine.dart';
 import 'package:flutter/material.dart';
 import 'package:permission_handler/permission_handler.dart';
+import 'package:firebase_auth/firebase_auth.dart'; // Add Firebase Auth if needed
 import 'package:firebase_database/firebase_database.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:geocoding/geocoding.dart'; // Geocoding package for reverse geocoding
+import 'package:geocoding/geocoding.dart'; // Geocoding package for reverse and forward geocoding
 import 'package:audioplayers/audioplayers.dart';
 import 'package:http/http.dart' as http;
-import 'home_page.dart'; // Make sure HomePage is imported
+import 'home_page.dart';
+import 'activity_page.dart';
 
 class FireReportVideoCallPage extends StatefulWidget {
   final String appId;
@@ -40,6 +44,10 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
   String? _callKey;
   bool _isAnswered = false; // Whether the admin joined
 
+  // New State Variables for Latitude and Longitude
+  double? _latitude;
+  double? _longitude;
+
   @override
   void initState() {
     super.initState();
@@ -54,7 +62,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
     await [Permission.microphone, Permission.camera].request();
 
     // Initialize Agora
-    _engine = await createAgoraRtcEngine();
+    _engine = createAgoraRtcEngine();
     await _engine.initialize(
       RtcEngineContext(
         appId: widget.appId,
@@ -68,7 +76,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
         onJoinChannelSuccess: (RtcConnection connection, int elapsed) {
           debugPrint('Resident joined the channel');
           _saveCallDetails(); // Save the call details to Firebase
-          _notifyAdmin();     // Notify admin about the call
+          _notifyAdmin(); // Notify admin about the call
           setState(() {
             _localUserJoined = true;
           });
@@ -83,7 +91,8 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
             _isAnswered = true;
           });
         },
-        onUserOffline: (RtcConnection connection, int remoteUid, UserOfflineReasonType reason) {
+        onUserOffline: (RtcConnection connection, int remoteUid,
+            UserOfflineReasonType reason) {
           debugPrint('Admin user $remoteUid left');
           setState(() {
             _remoteUid = null;
@@ -120,9 +129,27 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
 
   Future<void> _getCurrentLocationAndAddress() async {
     try {
+      // Check and request location permissions
+      LocationPermission permission = await Geolocator.checkPermission();
+      if (permission == LocationPermission.denied ||
+          permission == LocationPermission.deniedForever) {
+        permission = await Geolocator.requestPermission();
+        if (permission != LocationPermission.whileInUse &&
+            permission != LocationPermission.always) {
+          debugPrint('Location permissions are denied');
+          return;
+        }
+      }
+
       Position position = await Geolocator.getCurrentPosition(
         desiredAccuracy: LocationAccuracy.high,
       );
+
+      // Store latitude and longitude
+      setState(() {
+        _latitude = position.latitude;
+        _longitude = position.longitude;
+      });
 
       List<Placemark> placemarks =
           await placemarkFromCoordinates(position.latitude, position.longitude);
@@ -140,10 +167,17 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
   Future<void> _saveCallDetails() async {
     if (_currentAddress == null) return;
 
+    // Assuming you have a way to get the caller's unique ID, e.g., from the user's auth information
+    String callerID = FirebaseAuth.instance.currentUser?.uid ??
+        'user_${DateTime.now().millisecondsSinceEpoch}'; // Use Firebase UID or fallback
+
     final callDetails = {
       'channelName': widget.channelName,
+      'callerID': callerID, // Add the callerID here
       'residentName': 'Resident ${DateTime.now().millisecondsSinceEpoch}',
       'address': _currentAddress,
+      'latitude': _latitude ?? 0.0, // Save latitude, default to 0.0 if null
+      'longitude': _longitude ?? 0.0, // Save longitude, default to 0.0 if null
       'time': DateTime.now().toIso8601String(),
       'status': 'Ongoing',
     };
@@ -153,7 +187,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
       _callKey = callRef.key;
     });
     await callRef.set(callDetails);
-    debugPrint('Call details saved to Firebase');
+    debugPrint('Call details saved to Firebase with callerID: $callerID');
   }
 
   Future<void> _updateCallStatus(String status) async {
@@ -165,7 +199,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
   Future<void> _notifyAdmin() async {
     try {
       final response = await http.post(
-        Uri.parse('https://yourserver.com/notify_admin.php'),
+        Uri.parse('https://yourserver.com/notify_admin.php'), // Replace with your server URL
         headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'channel': widget.channelName}),
       );
@@ -183,7 +217,7 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
   Future<void> _playRingtone() async {
     try {
       await _audioPlayer.setReleaseMode(ReleaseMode.loop);
-      await _audioPlayer.play(AssetSource('ringtone.mp3'));
+      await _audioPlayer.play(AssetSource('ringtone.mp3')); // Ensure ringtone.mp3 is in assets
     } catch (e) {
       debugPrint("Error playing ringtone: $e");
     }
@@ -209,6 +243,34 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
       _isCameraFront = !_isCameraFront;
     });
     await _engine.switchCamera();
+  }
+
+  // Show the "Thank You" dialog
+  void _showEndCallDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false, // Prevent closing the dialog by tapping outside
+      builder: (BuildContext context) {
+        return AlertDialog(
+          title: const Text('Call Ended'),
+          content: const Text(
+              'Thank you for calling. You will be redirected to the Activity page to monitor your report.'),
+          actions: [
+            TextButton(
+              onPressed: () {
+                Navigator.of(context).pop(); // Close the dialog
+                // Navigate to ActivityPage
+                Navigator.pushReplacement(
+                  context,
+                  MaterialPageRoute(builder: (context) => const ActivityPage()),
+                );
+              },
+              child: const Text('OK'),
+            ),
+          ],
+        );
+      },
+    );
   }
 
   // Show the "Sorry admin didn't answer" dialog
@@ -242,10 +304,12 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
     // Stop the ringtone if still playing
     _stopRingtone();
 
-    // If user closes screen and call was never answered, set Missed
+    // Only mark as "Missed Call" if admin never joined.
+    // If admin joined, we do not update the status here (retains last status).
     if (!_isAnswered) {
       _updateCallStatus("Missed Call");
     }
+
     _engine.leaveChannel();
     _engine.release();
     super.dispose();
@@ -322,17 +386,18 @@ class _FireReportVideoCallPageState extends State<FireReportVideoCallPage> {
                     // Always stop the ring first
                     await _stopRingtone();
 
-                    // If admin never answered, it's a missed call scenario
-                    if (!_isAnswered) {
-                      _updateCallStatus("Missed Call");
+                    // Update call status based on whether it was answered
+                    if (_isAnswered) {
+                      // Leave the Agora channel
                       await _engine.leaveChannel();
-
-                      // Show missed call dialog
-                      _showMissedCallDialog();
+                      // Show the thank you dialog and navigate to ActivityPage
+                      _showEndCallDialog();
                     } else {
-                      // If the admin answered, just end the call
+                      _updateCallStatus("Missed Call");
+                      // Leave the Agora channel
                       await _engine.leaveChannel();
-                      Navigator.pop(context);
+                      // Show missed call dialog and navigate to HomePage
+                      _showMissedCallDialog();
                     }
                   },
                   tooltip: 'End Call',
