@@ -37,8 +37,11 @@ class ActivityPageState extends State<ActivityPage>
   }
 
   // Fetch reports based on the logged-in user's UID
-  // We will fetch location + latitude + longitude from the same place
   Future<void> _fetchReports() async {
+    setState(() {
+      isLoading = true;
+    });
+
     try {
       final user = FirebaseAuth.instance.currentUser;
       if (user == null) {
@@ -52,28 +55,28 @@ class ActivityPageState extends State<ActivityPage>
       final userId = user.uid;
 
       // References to the necessary database nodes
-      final reportsRef = FirebaseDatabase.instance.ref("reports_image");
+      final reportsImageRef = FirebaseDatabase.instance.ref("reports_image");
       final callsRef = FirebaseDatabase.instance.ref("Calls");
+      final dispatchesRef = FirebaseDatabase.instance.ref("dispatches");
 
       // Temporary storage for all combined reports
       List<Map<String, dynamic>> allReports = [];
 
       // 1) Fetch from "reports_image"
-      final reportsSnapshot = await reportsRef.get();
-      if (reportsSnapshot.exists) {
-        final reportsData = reportsSnapshot.value as Map<dynamic, dynamic>;
-        reportsData.forEach((key, value) {
+      final reportsImageSnapshot = await reportsImageRef.get();
+      if (reportsImageSnapshot.exists) {
+        final reportsImageData =
+            reportsImageSnapshot.value as Map<dynamic, dynamic>;
+        reportsImageData.forEach((key, value) {
           final reportData = value as Map<dynamic, dynamic>;
 
           // Grab location, latitude, and longitude from "reports_image" node
-          // (Adjust the field names below to match your DB if different)
-          final fetchedLocation = reportData['location'] ?? 'No location provided';
-          final fetchedLat = reportData['latitude'] ?? 0.0;
-          final fetchedLong = reportData['longitude'] ?? 0.0;
-
-          // If your DB stores them as strings, parse them:
-          // double finalLat = fetchedLat is String ? double.parse(fetchedLat) : fetchedLat;
-          // double finalLong = fetchedLong is String ? double.parse(fetchedLong) : fetchedLong;
+          final fetchedLocation =
+              reportData['location'] ?? 'No location provided';
+          final fetchedLat =
+              double.tryParse(reportData['latitude']?.toString() ?? '') ?? 0.0;
+          final fetchedLong =
+              double.tryParse(reportData['longitude']?.toString() ?? '') ?? 0.0;
 
           allReports.add({
             'id': key,
@@ -81,18 +84,24 @@ class ActivityPageState extends State<ActivityPage>
             'title': reportData['title'] ?? 'Untitled',
             'status': reportData['status'] ?? 'Pending',
             'date': reportData['timestamp'] ?? 'Unknown Date',
-            'description': reportData['description'] ?? 'No description provided.',
+            'description':
+                reportData['description'] ?? 'No description provided.',
             'fireTruckNumber': reportData['fireTruckNumber'] ?? 'Unknown',
             'location': fetchedLocation,
             'senderId': reportData['senderId'] ?? '',
             'senderName': reportData['senderName'] ?? 'Unknown',
 
             // Fire station name if you store it in the same node (adjust field name as needed)
-            'fireStationName': reportData['fireStationName'] ?? 'Unknown Fire Station',
+            'fireStationName':
+                reportData['fireStationName'] ?? 'Unknown Fire Station',
 
             // Direct lat/long from the node
             'latitude': fetchedLat,
             'longitude': fetchedLong,
+
+            // Placeholder for rescuer's location
+            'rescuer_latitude': null,
+            'rescuer_longitude': null,
           });
         });
       }
@@ -104,13 +113,12 @@ class ActivityPageState extends State<ActivityPage>
         callsData.forEach((key, value) {
           final callData = value as Map<dynamic, dynamic>;
 
-          final fetchedLocation = callData['address'] ?? 'No address provided';
-          final fetchedLat = callData['latitude'] ?? 0.0;
-          final fetchedLong = callData['longitude'] ?? 0.0;
-
-          // If your DB stores them as strings, parse them similarly
-          // double finalLat = fetchedLat is String ? double.parse(fetchedLat) : fetchedLat;
-          // double finalLong = fetchedLong is String ? double.parse(fetchedLong) : fetchedLong;
+          final fetchedLocation =
+              callData['address'] ?? 'No address provided';
+          final fetchedLat =
+              double.tryParse(callData['latitude']?.toString() ?? '') ?? 0.0;
+          final fetchedLong =
+              double.tryParse(callData['longitude']?.toString() ?? '') ?? 0.0;
 
           allReports.add({
             'id': key,
@@ -118,7 +126,8 @@ class ActivityPageState extends State<ActivityPage>
             'title': 'Phone Call', // or something else if you like
             'status': callData['status'] ?? 'Unknown',
             'date': callData['time'] ?? 'Unknown Date',
-            'description': 'Caller Name: ${callData['callerName'] ?? 'N/A'}\n'
+            'description':
+                'Caller Name: ${callData['callerName'] ?? 'N/A'}\n'
                 'Contact Number: ${callData['contactNumber'] ?? 'N/A'}\n'
                 'Address: $fetchedLocation',
             'fireTruckNumber': 'N/A', // calls may not have a fireTruckNumber
@@ -127,16 +136,53 @@ class ActivityPageState extends State<ActivityPage>
             'senderName': callData['callerName'] ?? 'Unknown',
 
             // Fire station name if you store it in the same node
-            'fireStationName': callData['fireStationName'] ?? 'Unknown Fire Station',
+            'fireStationName':
+                callData['fireStationName'] ?? 'Unknown Fire Station',
 
             // Direct lat/long from the node
             'latitude': fetchedLat,
             'longitude': fetchedLong,
+
+            // Placeholder for rescuer's location
+            'rescuer_latitude': null,
+            'rescuer_longitude': null,
           });
         });
       }
 
-      // 3) Filter the combined list into ongoing / completed
+      // 3) Fetch from "dispatches"
+      final dispatchesSnapshot = await dispatchesRef.get();
+      Map<String, Map<dynamic, dynamic>> reportKeyToDispatch = {};
+      if (dispatchesSnapshot.exists) {
+        final dispatchesData = dispatchesSnapshot.value as Map<dynamic, dynamic>;
+        dispatchesData.forEach((key, value) {
+          final dispatchData = value as Map<dynamic, dynamic>;
+          final reportKey = dispatchData['reportKey'];
+          if (reportKey != null) {
+            reportKeyToDispatch[reportKey.toString()] = dispatchData;
+          }
+        });
+      }
+
+      // 4) Associate dispatches with reports
+      for (var report in allReports) {
+        final dispatch = reportKeyToDispatch[report['id']];
+        if (dispatch != null) {
+          final realTimeLocation = dispatch['realTimeLocation'];
+          if (realTimeLocation != null) {
+            final rescuerLat = double.tryParse(
+                    realTimeLocation['latitude']?.toString() ?? '') ??
+                0.0;
+            final rescuerLong = double.tryParse(
+                    realTimeLocation['longitude']?.toString() ?? '') ??
+                0.0;
+            report['rescuer_latitude'] = rescuerLat;
+            report['rescuer_longitude'] = rescuerLong;
+          }
+        }
+      }
+
+      // 5) Filter the combined list into ongoing / completed
       ongoingReports = allReports
           .where((report) =>
               report['senderId'] == userId && report['status'] != 'Resolved')
@@ -170,17 +216,17 @@ class ActivityPageState extends State<ActivityPage>
     List<Map<String, dynamic>> reportsNeedingFeedback = [];
 
     for (var report in completedReports) {
-      // For call-based reports, you might or might not want feedback.
-      // If you only want feedback on image-based reports, check 'reportVia'
-      bool hasFeedback = await _hasFeedback(report['id']);
-      if (!hasFeedback && report['reportVia'] == 'Image') {
+      // Check if feedback exists regardless of report type
+      bool hasFeedback = await _hasFeedback(report['id'], report['reportVia']);
+      if (!hasFeedback) {
         reportsNeedingFeedback.add(report);
       }
     }
 
     // Iterate through each report and show feedback dialog
     for (var report in reportsNeedingFeedback) {
-      await _showFeedbackDialog(report['id'], report['title']);
+      await _showFeedbackDialog(
+          report['id'], report['title'], report['reportVia']);
     }
 
     // After all feedbacks are prompted, refresh the reports
@@ -188,7 +234,8 @@ class ActivityPageState extends State<ActivityPage>
   }
 
   // Function to show feedback dialog for a specific report
-  Future<void> _showFeedbackDialog(String reportId, String reportTitle) async {
+  Future<void> _showFeedbackDialog(
+      String reportId, String reportTitle, String reportVia) async {
     int _rating = 0;
     String _comment = '';
     final _formKey = GlobalKey<FormState>();
@@ -196,7 +243,8 @@ class ActivityPageState extends State<ActivityPage>
     // Show the feedback dialog
     await showDialog(
       context: context,
-      barrierDismissible: false, // Prevent dismissing by tapping outside
+      barrierDismissible:
+          false, // Prevent dismissing by tapping outside
       builder: (context) {
         return StatefulBuilder(
           builder: (context, setState) {
@@ -208,7 +256,10 @@ class ActivityPageState extends State<ActivityPage>
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      Text('Report: $reportTitle'),
+                      Text(
+                        'Report: $reportTitle',
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                       const SizedBox(height: 10),
                       const Text('Please rate our service:'),
                       const SizedBox(height: 10),
@@ -217,7 +268,9 @@ class ActivityPageState extends State<ActivityPage>
                         children: List.generate(5, (index) {
                           return IconButton(
                             icon: Icon(
-                              index < _rating ? Icons.star : Icons.star_border,
+                              index < _rating
+                                  ? Icons.star
+                                  : Icons.star_border,
                               color: Colors.amber,
                             ),
                             onPressed: () {
@@ -262,9 +315,19 @@ class ActivityPageState extends State<ActivityPage>
                       return;
                     }
 
-                    // Save feedback to Firebase under this particular report
-                    final feedbackRef = FirebaseDatabase.instance
-                        .ref("reports_image/$reportId/feedback");
+                    // Determine the correct feedback path based on report type
+                    String feedbackPath = '';
+                    if (reportVia == 'Image') {
+                      feedbackPath = "reports_image/$reportId/feedback";
+                    } else if (reportVia == 'Call') {
+                      feedbackPath = "Calls/$reportId/feedback";
+                    } else {
+                      feedbackPath = "reports/$reportId/feedback";
+                    }
+
+                    // Save feedback to Firebase under the appropriate node
+                    final feedbackRef =
+                        FirebaseDatabase.instance.ref(feedbackPath);
                     await feedbackRef.set({
                       'rating': _rating,
                       'comment': _comment,
@@ -289,52 +352,71 @@ class ActivityPageState extends State<ActivityPage>
   }
 
   // Helper function to check if feedback exists for a report
-  Future<bool> _hasFeedback(String reportId) async {
-    final feedbackRef =
-        FirebaseDatabase.instance.ref("reports_image/$reportId/feedback");
+  Future<bool> _hasFeedback(String reportId, String reportVia) async {
+    String feedbackPath = '';
+    if (reportVia == 'Image') {
+      feedbackPath = "reports_image/$reportId/feedback";
+    } else if (reportVia == 'Call') {
+      feedbackPath = "Calls/$reportId/feedback";
+    } else {
+      feedbackPath = "reports/$reportId/feedback"; // Generic path
+    }
+    final feedbackRef = FirebaseDatabase.instance.ref(feedbackPath);
     final feedbackSnapshot = await feedbackRef.get();
     return feedbackSnapshot.exists;
   }
 
   // Function to show feedback dialog when a completed report is tapped
-  Future<void> _showFeedbackOnTap(String reportId) async {
+  Future<void> _showFeedbackOnTap(String reportId, String reportVia) async {
     // Check if feedback already exists
-    final feedbackRef =
-        FirebaseDatabase.instance.ref("reports_image/$reportId/feedback");
-    final feedbackSnapshot = await feedbackRef.get();
+    bool feedbackExists = await _hasFeedback(reportId, reportVia);
 
-    if (feedbackSnapshot.exists) {
+    if (feedbackExists) {
       // Feedback already provided, optionally show it or inform the user
-      final existingFeedback =
-          feedbackSnapshot.value as Map<dynamic, dynamic>;
-      showDialog(
-        context: context,
-        builder: (context) {
-          return AlertDialog(
-            title: const Text('Feedback Already Provided'),
-            content: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Text('Rating: ${existingFeedback['rating']}'),
-                const SizedBox(height: 10),
-                Text(
-                    'Comment: ${existingFeedback['comment'] ?? 'No comment provided.'}'),
-              ],
-            ),
-            actions: [
-              TextButton(
-                child: const Text('OK'),
-                onPressed: () => Navigator.of(context).pop(),
+      String feedbackPath = '';
+      if (reportVia == 'Image') {
+        feedbackPath = "reports_image/$reportId/feedback";
+      } else if (reportVia == 'Call') {
+        feedbackPath = "Calls/$reportId/feedback";
+      } else {
+        feedbackPath = "reports/$reportId/feedback";
+      }
+
+      final feedbackRef = FirebaseDatabase.instance.ref(feedbackPath);
+      final feedbackSnapshot = await feedbackRef.get();
+
+      if (feedbackSnapshot.exists) {
+        final existingFeedback =
+            feedbackSnapshot.value as Map<dynamic, dynamic>;
+        showDialog(
+          context: context,
+          builder: (context) {
+            return AlertDialog(
+              title: const Text('Feedback Already Provided'),
+              content: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text('Rating: ${existingFeedback['rating']}'),
+                  const SizedBox(height: 10),
+                  Text(
+                      'Comment: ${existingFeedback['comment'] ?? 'No comment provided.'}'),
+                ],
               ),
-            ],
-          );
-        },
-      );
-      return;
+              actions: [
+                TextButton(
+                  child: const Text('OK'),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ],
+            );
+          },
+        );
+        return;
+      }
     }
 
     // If no feedback exists, show the feedback dialog
-    await _showFeedbackDialog(reportId, "Report $reportId");
+    await _showFeedbackDialog(reportId, "Report $reportId", reportVia);
   }
 
   @override
@@ -364,7 +446,7 @@ class ActivityPageState extends State<ActivityPage>
           child: TabBar(
             controller: _tabController,
             labelColor: Colors.white,
-            unselectedLabelColor: Color.fromARGB(255, 255, 249, 249),
+            unselectedLabelColor: const Color.fromARGB(255, 255, 249, 249),
             indicator: BoxDecoration(
               color: Colors.red,
               borderRadius: BorderRadius.circular(5),
@@ -400,127 +482,122 @@ class ActivityPageState extends State<ActivityPage>
   Widget _buildReportList(List<Map<String, dynamic>> reports,
       {required bool isCompleted}) {
     if (reports.isEmpty) {
-      return const Center(
-        child: Text('No reports available.'),
+      return Center(
+        child: Text(
+          'No reports available.',
+          style: TextStyle(fontSize: 16, color: Colors.grey[700]),
+        ),
       );
     }
 
-    return ListView.builder(
-      padding: const EdgeInsets.all(10),
-      itemCount: reports.length,
-      itemBuilder: (context, index) {
-        final report = reports[index];
-        return GestureDetector(
-          onTap: () async {
-            // If the report is completed and was reported via image, let user see or give feedback
-            if (isCompleted && report['reportVia'] == 'Image') {
-              await _showFeedbackOnTap(report['id']);
-            }
-            // If the report is ongoing and is an image-based report, navigate to FireTruckMovementPage
-            else if (!isCompleted && report['reportVia'] == 'Image') {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => FireTruckMovementPage(
-                    location: report['location'] ?? 'Unknown Location',
-                    fireTruckNumber: report['fireTruckNumber'] ?? 'Unknown Truck',
-                    fireStationName: report['fireStationName'] ?? 'Unknown Station',
-                    // Pass latitude & longitude to FireTruckMovementPage
-                    latitude: (report['latitude'] is num)
-                        ? report['latitude']
-                        : 0.0,
-                    longitude: (report['longitude'] is num)
-                        ? report['longitude']
-                        : 0.0,
+    return RefreshIndicator(
+      onRefresh: _fetchReports,
+      child: ListView.builder(
+        padding: const EdgeInsets.all(10),
+        itemCount: reports.length,
+        itemBuilder: (context, index) {
+          final report = reports[index];
+          return GestureDetector(
+            onTap: () async {
+              if (report['status'] == 'Resolved') {
+                await _showFeedbackOnTap(report['id'], report['reportVia']);
+              } else {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => FireTruckMovementPage(
+                      location: report['location'] ?? 'Unknown Location',
+                      fireTruckNumber:
+                          report['fireTruckNumber'] ?? 'Unknown Truck',
+                      fireStationName:
+                          report['fireStationName'] ?? 'Unknown Station',
+                      // Pass latitude & longitude to FireTruckMovementPage
+                      latitude: (report['latitude'] is num)
+                          ? report['latitude']
+                          : 0.0,
+                      longitude: (report['longitude'] is num)
+                          ? report['longitude']
+                          : 0.0,
+                      rescuerLatitude: (report['rescuer_latitude'] is num)
+                          ? report['rescuer_latitude']
+                          : 0.0,
+                      rescuerLongitude: (report['rescuer_longitude'] is num)
+                          ? report['rescuer_longitude']
+                          : 0.0,
+                    ),
                   ),
-                ),
-              );
-            } else {
-              // For call-based reports or other statuses, you can decide how to navigate
-              showDialog(
-                context: context,
-                builder: (context) {
-                  return AlertDialog(
-                    title: Text('Call Report Details'),
-                    content: Text(report['description'] ?? 'No details'),
-                    actions: [
-                      TextButton(
-                        onPressed: () => Navigator.of(context).pop(),
-                        child: const Text('Close'),
+                );
+              }
+            },
+            child: Card(
+              elevation: 5,
+              margin: const EdgeInsets.symmetric(vertical: 10),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Container(
+                padding: const EdgeInsets.all(15),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      // Include "reportVia" if you want to show "Call" vs "Image"
+                      'Status: ${report['status']} (${report['reportVia']})',
+                      style: TextStyle(
+                        fontSize: 16,
+                        color: _getStatusColor(report['status']!),
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
-                  );
-                },
-              );
-            }
-          },
-          child: Card(
-            elevation: 5,
-            margin: const EdgeInsets.symmetric(vertical: 10),
-            shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(15),
-            ),
-            child: Container(
-              padding: const EdgeInsets.all(15),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    // Include "reportVia" if you want to show "Call" vs "Image"
-                    'Status: ${report['status']} (${report['reportVia']})',
-                    style: TextStyle(
-                      fontSize: 16,
-                      color: _getStatusColor(report['status']!),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  Text(
-                    'Date: ${report['date']}',
-                    style: const TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey,
+                    const SizedBox(height: 5),
+                    Text(
+                      'Date: ${report['date']}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Colors.grey,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 10),
-                  Text(
-                    'Location: ${report['location']}',
-                    style: const TextStyle(
-                      fontSize: 14,
+                    const SizedBox(height: 10),
+                    Text(
+                      'Location: ${report['location']}',
+                      style: const TextStyle(
+                        fontSize: 14,
+                      ),
                     ),
-                  ),
-                  const SizedBox(height: 5),
-                  if (isCompleted && report['reportVia'] == 'Image')
-                    FutureBuilder<bool>(
-                      future: _hasFeedback(report['id']),
-                      builder: (context, snapshot) {
-                        if (snapshot.connectionState ==
-                            ConnectionState.waiting) {
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 10),
-                            child: CircularProgressIndicator(),
-                          );
-                        } else if (snapshot.hasData && snapshot.data == true) {
-                          return const Padding(
-                            padding: EdgeInsets.only(top: 10),
-                            child: Text(
-                              'Feedback Provided',
-                              style: TextStyle(
-                                color: Colors.green,
-                                fontWeight: FontWeight.bold,
+                    const SizedBox(height: 5),
+                    if (isCompleted)
+                      FutureBuilder<bool>(
+                        future: _hasFeedback(report['id'], report['reportVia']),
+                        builder: (context, snapshot) {
+                          if (snapshot.connectionState ==
+                              ConnectionState.waiting) {
+                            return const Padding(
+                              padding: EdgeInsets.only(top: 10),
+                              child: CircularProgressIndicator(),
+                            );
+                          } else if (snapshot.hasData && snapshot.data == true) {
+                            return const Padding(
+                              padding: EdgeInsets.only(top: 10),
+                              child: Text(
+                                'Feedback Provided',
+                                style: TextStyle(
+                                  color: Colors.green,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                            ),
-                          );
-                        } else {
-                          return const SizedBox.shrink();
-                        }
-                      },
-                    ),
-                ],
+                            );
+                          } else {
+                            return const SizedBox.shrink();
+                          }
+                        },
+                      ),
+                  ],
+                ),
               ),
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 
@@ -534,6 +611,8 @@ class ActivityPageState extends State<ActivityPage>
         return Colors.blue;
       case 'Accepted':
         return Colors.purple; // You can change it to any color you like
+      case 'Dispatched':
+        return Colors.red; // Added color for 'Dispatched' status
       default:
         return Colors.black;
     }

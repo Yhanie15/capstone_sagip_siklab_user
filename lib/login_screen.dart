@@ -217,8 +217,8 @@ class LoginScreenState extends State<LoginScreen> {
                 alignment: Alignment.center,
                 child: Column(
                   children: [
+                    const SizedBox(height: 40),
                     Image.asset('assets/logo.png', height: 120), // Logo from assets
-                    const SizedBox(height: 20),
                     const Text(
                       'Welcome Back!',
                       style: TextStyle(
