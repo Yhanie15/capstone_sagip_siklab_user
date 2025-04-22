@@ -395,9 +395,6 @@ class HomePageState extends State<HomePage> {
                                       context,
                                       MaterialPageRoute(
                                         builder: (context) => const FireReportVideoCallPage(
-                                          channelName: 'sagip_siklab', // Replace with your desired channel name
-                                          token: '007eJxTYCjeLHFGdIuirVZa0c11B0+6t3Jd+LPeV7xk8a8re1buFVVXYLBMtEg0NEwxTUszSDRJM7awSDGzTEszTzJNszAwNrY0ul/+Or0hkJFh3UJ5BkYoBPF5GIoT0zML4oszs3MSkxgYAKw6JAQ=',
-                                          appId: '9a8a11d5ff0a4f388d69ff7b5f803392', // Replace with your Agora App ID
                                         ),
                                       ),
                                     );

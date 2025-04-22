@@ -1,0 +1,2 @@
+C:/Users/hi/OneDrive/Desktop/capstone_sagip_siklab_user-1/android/app/.cxx/RelWithDebInfo/4b4x6f6e/arm64-v8a/CMakeFiles/edit_cache.dir
+C:/Users/hi/OneDrive/Desktop/capstone_sagip_siklab_user-1/android/app/.cxx/RelWithDebInfo/4b4x6f6e/arm64-v8a/CMakeFiles/rebuild_cache.dir

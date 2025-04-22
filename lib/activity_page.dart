@@ -132,7 +132,8 @@ class ActivityPageState extends State<ActivityPage>
                 'Address: $fetchedLocation',
             'fireTruckNumber': 'N/A', // calls may not have a fireTruckNumber
             'location': fetchedLocation,
-            'senderId': callData['callerID'] ?? '',
+            'senderId': callData['residentId'] ??
+                        callData['callerID']  ?? '',
             'senderName': callData['callerName'] ?? 'Unknown',
 
             // Fire station name if you store it in the same node
@@ -182,15 +183,17 @@ class ActivityPageState extends State<ActivityPage>
         }
       }
 
-      // 5) Filter the combined list into ongoing / completed
+      // 5) Filter the combined list into ongoing / completed (using case‑insensitive comparison)
       ongoingReports = allReports
           .where((report) =>
-              report['senderId'] == userId && report['status'] != 'Resolved')
+              report['senderId'] == userId &&
+              report['status'].toString().toLowerCase() != 'resolved')
           .toList();
 
       completedReports = allReports
           .where((report) =>
-              report['senderId'] == userId && report['status'] == 'Resolved')
+              report['senderId'] == userId &&
+              report['status'].toString().toLowerCase() == 'resolved')
           .toList();
 
       setState(() {
@@ -234,122 +237,142 @@ class ActivityPageState extends State<ActivityPage>
   }
 
   // Function to show feedback dialog for a specific report
-  Future<void> _showFeedbackDialog(
-      String reportId, String reportTitle, String reportVia) async {
-    int _rating = 0;
-    String _comment = '';
-    final _formKey = GlobalKey<FormState>();
+Future<void> _showFeedbackDialog(
+  String reportId,
+  String reportTitle,
+  String reportVia,
+) async {
+  int _rating = 0;
+  String _comment = '';
+  final _formKey = GlobalKey<FormState>();
 
-    // Show the feedback dialog
-    await showDialog(
-      context: context,
-      barrierDismissible:
-          false, // Prevent dismissing by tapping outside
-      builder: (context) {
-        return StatefulBuilder(
-          builder: (context, setState) {
-            return AlertDialog(
-              title: const Text('Report Resolved'),
-              content: SingleChildScrollView(
-                child: Form(
-                  key: _formKey,
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        'Report: $reportTitle',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                      const SizedBox(height: 10),
-                      const Text('Please rate our service:'),
-                      const SizedBox(height: 10),
-                      Wrap(
-                        alignment: WrapAlignment.center,
-                        children: List.generate(5, (index) {
-                          return IconButton(
-                            icon: Icon(
-                              index < _rating
-                                  ? Icons.star
-                                  : Icons.star_border,
-                              color: Colors.amber,
-                            ),
-                            onPressed: () {
-                              setState(() {
-                                _rating = index + 1;
-                              });
-                            },
-                          );
-                        }),
-                      ),
-                      const SizedBox(height: 10),
-                      TextFormField(
-                        decoration: const InputDecoration(
-                          labelText: 'Additional Comments (Optional)',
-                          border: OutlineInputBorder(),
+  await showDialog(
+    context: context,
+    barrierDismissible: false, // Prevent dismissing by tapping outside
+    builder: (context) {
+      return StatefulBuilder(
+        builder: (context, setState) {
+          return AlertDialog(
+            // Rounded corners
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(16),
+            ),
+            title: const Text(
+              'Report Resolved',
+              style: TextStyle(
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            content: SingleChildScrollView(
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      'Report: $reportTitle',
+                      style: const TextStyle(fontWeight: FontWeight.w500),
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Please rate our service:',
+                      style: TextStyle(fontSize: 16),
+                    ),
+                    const SizedBox(height: 12),
+                    // Row with mainAxisSize.min and removed extra padding for IconButton
+                   Wrap(
+                   alignment: WrapAlignment.center,
+                   spacing: 4.0, // Adjust spacing between stars
+                   children: List.generate(5, (index) {
+                   return IconButton(
+                   padding: EdgeInsets.zero, // Remove default padding
+                   constraints: const BoxConstraints(), // Remove default constraints
+                   iconSize: 30.0, // Adjust star size if needed
+                   icon: Icon(
+                   index < _rating ? Icons.star : Icons.star_border,
+                   color: Colors.amber,
+                   ),
+                   onPressed: () {
+                   setState(() {
+                   _rating = index + 1;
+                   });
+                  },
+                );
+                }),
+                ),
+                    const SizedBox(height: 16),
+                    TextFormField(
+                      decoration: InputDecoration(
+                        labelText: 'Additional Comments (Optional)',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
-                        maxLines: 3,
-                        onChanged: (value) {
-                          _comment = value;
-                        },
                       ),
-                    ],
-                  ),
+                      maxLines: 3,
+                      onChanged: (value) {
+                        _comment = value;
+                      },
+                    ),
+                  ],
                 ),
               ),
-              actions: [
-                TextButton(
-                  child: const Text('Cancel'),
-                  onPressed: () => Navigator.of(context).pop(),
+            ),
+            actions: [
+              TextButton(
+                child: const Text('Cancel'),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+              ElevatedButton(
+                style: ElevatedButton.styleFrom(
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
                 ),
-                ElevatedButton(
-                  child: const Text('Submit'),
-                  onPressed: () async {
-                    if (_rating == 0) {
-                      // Show error if no rating is selected
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(
-                          content:
-                              Text('Please select a rating before submitting.'),
-                        ),
-                      );
-                      return;
-                    }
-
-                    // Determine the correct feedback path based on report type
-                    String feedbackPath = '';
-                    if (reportVia == 'Image') {
-                      feedbackPath = "reports_image/$reportId/feedback";
-                    } else if (reportVia == 'Call') {
-                      feedbackPath = "Calls/$reportId/feedback";
-                    } else {
-                      feedbackPath = "reports/$reportId/feedback";
-                    }
-
-                    // Save feedback to Firebase under the appropriate node
-                    final feedbackRef =
-                        FirebaseDatabase.instance.ref(feedbackPath);
-                    await feedbackRef.set({
-                      'rating': _rating,
-                      'comment': _comment,
-                      'timestamp': DateTime.now().toIso8601String(),
-                    });
-
-                    // Show confirmation
-                    Navigator.of(context).pop(); // Close the dialog
+                child: const Text('Submit'),
+                onPressed: () async {
+                  if (_rating == 0) {
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(
-                        content: Text('Thank you for your feedback!'),
+                        content: Text('Please select a rating before submitting.'),
                       ),
                     );
-                  },
-                ),
-              ],
-            );
-          },
-        );
-      },
-    );
-  }
+                    return;
+                  }
+
+                  String feedbackPath = '';
+                  if (reportVia == 'Image') {
+                    feedbackPath = "reports_image/$reportId/feedback";
+                  } else if (reportVia == 'Call') {
+                    feedbackPath = "Calls/$reportId/feedback";
+                  } else {
+                    feedbackPath = "reports/$reportId/feedback";
+                  }
+
+                  final feedbackRef = FirebaseDatabase.instance.ref(feedbackPath);
+                  await feedbackRef.set({
+                    'rating': _rating,
+                    'comment': _comment,
+                    'timestamp': DateTime.now().toIso8601String(),
+                  });
+
+                  Navigator.of(context).pop(); // Close the dialog
+                  ScaffoldMessenger.of(context).showSnackBar(
+                    const SnackBar(
+                      content: Text('Thank you for your feedback!'),
+                    ),
+                  );
+                },
+              ),
+            ],
+          );
+        },
+      );
+    },
+  );
+}
+
+
 
   // Helper function to check if feedback exists for a report
   Future<bool> _hasFeedback(String reportId, String reportVia) async {
@@ -481,6 +504,11 @@ class ActivityPageState extends State<ActivityPage>
 
   Widget _buildReportList(List<Map<String, dynamic>> reports,
       {required bool isCompleted}) {
+    // Filter out reports with status "Missed Call" and "Ended"
+    reports = reports.where((report) => 
+        report['status'] != 'Missed Call' && 
+        report['status'] != 'Ended').toList();
+
     if (reports.isEmpty) {
       return Center(
         child: Text(
@@ -501,7 +529,8 @@ class ActivityPageState extends State<ActivityPage>
             onTap: () async {
               if (report['status'] == 'Resolved') {
                 await _showFeedbackOnTap(report['id'], report['reportVia']);
-              } else {
+              } else if (report['status'] == 'Dispatched') {
+                // Only navigate to FireTruckMovementPage if status is "Dispatched"
                 Navigator.push(
                   context,
                   MaterialPageRoute(
@@ -524,10 +553,13 @@ class ActivityPageState extends State<ActivityPage>
                       rescuerLongitude: (report['rescuer_longitude'] is num)
                           ? report['rescuer_longitude']
                           : 0.0,
+                      rescuerId: report['rescuerId'] ?? 'Unknown Rescuer',
+                      reportKey: report['id'] ?? 'Unknown Report Key',
                     ),
                   ),
                 );
               }
+              // Do nothing for "Answered" and "Dispatching" status
             },
             child: Card(
               elevation: 5,
@@ -613,6 +645,10 @@ class ActivityPageState extends State<ActivityPage>
         return Colors.purple; // You can change it to any color you like
       case 'Dispatched':
         return Colors.red; // Added color for 'Dispatched' status
+      case 'Answered':
+        return Colors.teal; // Added color for 'Answered' status
+      case 'Dispatching':
+        return Colors.orange; // Added color for 'Dispatching' status
       default:
         return Colors.black;
     }

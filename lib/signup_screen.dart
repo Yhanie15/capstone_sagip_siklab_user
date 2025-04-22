@@ -12,12 +12,44 @@ import 'login_screen.dart';
 
 // Example data for Districts and Barangays
 const Map<String, List<String>> districtsAndBarangays = {
-  'District 1': ['Barangay 1A', 'Barangay 1B', 'Barangay 1C'],
-  'District 2': ['Barangay 2A', 'Barangay 2B', 'Barangay 2C'],
-  'District 3': ['Barangay 3A', 'Barangay 3B', 'Barangay 3C'],
-  'District 4': ['Barangay 4A', 'Barangay 4B', 'Barangay 4C'],
-  'District 5': ['Barangay 5A', 'Barangay 5B', 'Barangay 5C'],
-  'District 6': ['Barangay 6A', 'Barangay 6B', 'Barangay 6C'],
+  'District 1': [
+    'Alicia', 'Bagong Pagasa', 'Bahay Toro', 'Balingasa', 'Bungad', 'Damar', 'Damayan',
+    'Del Monte', 'Katipunan', 'Lourdes', 'Maharlika', 'Manresa', 'Mariblo', 'Masambong',
+    'N.S. Amoranto', 'Nayon Kanluran', 'Paang Bundok', 'Pag-ibig sa Nayon', 'Paltok',
+    'Paraiso', 'Phil-Am', 'Project 6', 'R. Magsaysay', 'Salvacion', 'San Antonio',
+    'San Isidro Labrador', 'San Jose', 'Sienna', 'St. Peter', 'Sta. Cruz', 'Sta. Teresita',
+    'Sto. Cristo', 'Sto. Domingo', 'Talayan', 'Vasra', 'Veterans Village', 'West Triangle'
+  ],
+  'District 2': [
+    'Bagong Silangan', 'Batasan Hills', 'Commonwealth', 'Holy Spirit', 'Payatas'
+  ],
+  'District 3': [
+    'Amihan', 'Bagumbayan', 'Bagumbuhay', 'Bayanihan', 'Blue Ridge A', 'Blue Ridge B',
+    'Camp Aguinaldo', 'Claro', 'Dioquino Zobel', 'Duyan-duyan', 'E. Rodriguez',
+    'East Kamias', 'Escopa 1', 'Escopa 2', 'Escopa 3', 'Escopa 4', 'Libis', 'Loyola Heights',
+    'Manga', 'Marilag', 'Masagana', 'Matandang Balara', 'Milagrosa', 'Pansol',
+    'Quirino 2-A', 'Quirino 2-B', 'Quirino 2-C', 'Quirino 3-A', 'San Roque', 'Silangan',
+    'Socorro', 'St. Ignatius', 'Tagumpay', 'Ugong Norte', 'Villa Maria Clara', 'West Kamias',
+    'White Plains'
+  ],
+  'District 4': [
+    'B.L. ng Crame', 'Botocan', 'Central', 'Damar', 'Doña Aurora', 'Doña Imelda',
+    'Doña Josefa', 'Horseshoe', 'Immaculate Concepcion', 'Kalusugan', 'Kamuning',
+    'Kaunlaran', 'Kristong Hari', 'Krus na Ligas', 'Laging Handa', 'Malaya', 'Mariana',
+    'Obrero', 'Paligsahan', 'Pinagkaisahan', 'Pinyahan', 'Roxas', 'Sacred Heart',
+    'San Isidro Galas', 'San Martin de Porres', 'San Vicente', 'Santo Niño', 'Santol',
+    'Sikatuna Village', 'South Triangle', 'Tatalon', 'Teachers Village East',
+    'Teachers Village West', 'UP Campus', 'Valencia'
+  ],
+  'District 5': [
+    'Bagbag', 'Capri', 'Fairview', 'Greater Lagro', 'Gulod', 'Kaligayahan',
+    'Nagkaisang Nayon', 'North Fairview', 'Novaliches', 'Pasong Putik', 'San Agustin',
+    'San Bartolome', 'Sta. Lucia', 'Sta. Monica'
+  ],
+  'District 6': [
+    'Apolonio Samson', 'Baesa', 'Balumbato', 'Culiat', 'New Era', 'Pasong Tamo',
+    'Sangandaan', 'Sauyo', 'Talipapa', 'Tandang Sora', 'Unang Sigaw'
+  ],
 };
 
 class SignupScreen extends StatefulWidget {
